@@ -1,0 +1,67 @@
+
+/*************************************************************************
+ *  Usage:                                                               *
+ *		EXEC TOOLKIT_AddRevScheduleDates ScheduleID, Number, Frequency   *
+ *			ScheduleID - The ScheduleID to Update                        *
+ *          Number - The Number of Additional Date Sequences to Add      *
+ *          Frequency - ('M','Q','Y') Monthly/Quarterly/Yearly           *
+ *************************************************************************/	
+CREATE PROCEDURE [dbo].[TOOLKIT_AddRevScheduleDates] 
+(
+	@ScheduleID VARCHAR(20),
+	@Iterations INT,
+	@Frequency VARCHAR(5)
+)
+AS
+	/****************************************
+	 *   Frequency Values:                  *
+	 *       'M' = Monthly                  *
+	 *       'Q' = Quarterly                *
+	 *       'Y' = Yearly (Anually)         *
+	 ****************************************/
+	DECLARE @EffDate DATETIME
+	DECLARE @DueDate DATETIME
+	DECLARE @Sequence INT
+	DECLARE @StartEffDate DATETIME
+	DECLARE @StartDueDate DATETIME
+	DECLARE @StartSequence INT
+	DECLARE @Count INT
+	/* Bail Out on Bad Data */
+	IF ((SELECT COUNT(*) FROM Code_ReviewScheduleDates WHERE ScheduleID = @ScheduleID) < 1)
+	BEGIN
+		PRINT 'ScheduleID Not Found'
+		RETURN
+	END
+	SET @Count = 1
+	SELECT @StartEffDate = MAX(EffDate), @StartDueDate = MAX(DueDate), @StartSequence = MAX(Sequence) FROM Code_ReviewScheduleDates WHERE ScheduleID = @ScheduleID
+	SET @EffDate = @StartEffDate
+	SET @DueDate = @StartDueDate
+	SET @Sequence = @StartSequence
+	WHILE (@Count <= @Iterations)
+	BEGIN	
+		IF (UPPER(@Frequency) = 'M')
+		BEGIN	
+			SET @EffDate = DATEADD(MONTH,1,@EffDate)
+			SET @DueDate = DATEADD(MONTH,1,@DueDate)
+		END
+		ELSE IF (UPPER(@Frequency) = 'Q')
+		BEGIN
+			SET @EffDate = DATEADD(MONTH,3,@EffDate)
+			SET @DueDate = DATEADD(MONTH,3,@DueDate)
+		END
+		ELSE IF (UPPER(@Frequency) = 'Y')
+		BEGIN
+			SET @EffDate = DATEADD(YEAR,1,@EffDate)
+			SET @DueDate = DATEADD(YEAR,1,@DueDate)
+		END
+		ELSE
+		BEGIN
+			PRINT '**Unrecognized Frequency**'
+			RETURN
+		END
+		SET @Sequence = @Sequence + 1
+		INSERT INTO Code_ReviewScheduleDates (ScheduleID, Sequence, DueDate, EffDate) VALUES (@ScheduleID, @Sequence, @DueDate, @EffDate)
+		SET @Count = @Count + 1
+	END
+
+GO
