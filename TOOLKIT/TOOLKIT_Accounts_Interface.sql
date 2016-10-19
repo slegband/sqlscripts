@@ -1,4 +1,4 @@
-
+/*  Should use dbo.usp_InterfaceAccounts*/
 CREATE PROCEDURE [dbo].[TOOLKIT_Accounts_Interface]  
 (
 	@InterfaceID INT, 

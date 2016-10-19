@@ -18,23 +18,19 @@ CREATE PROCEDURE [dbo].[TOOLKIT_BuildTestUsers_withOwners]
 	@Reconcilers INT, @Reviewers INT, @Approvers INT, @AcctOwners INT, @Admins INT, @QA INT
 )
 AS
-	/* Declarations */
-	DECLARE @UserName AS VARCHAR(50)
-	DECLARE @Password AS VARCHAR(50)
+/* Declarations */
+	DECLARE @Counter AS Int = 1
+	DECLARE @Password AS VARCHAR(50) = 'f1no+2l/41Prfwb24n9VOg=='   --recon
 	DECLARE @DepartmentID AS VARCHAR(50)
 	DECLARE @LocationID AS VARCHAR(50)
 	DECLARE @ProgramAdminRoleID AS VARCHAR(50)
 	DECLARE @FirstName AS VARCHAR(50)
 	DECLARE @LastName AS VARCHAR(50)
 	DECLARE @FullName AS VARCHAR(100)
-	DECLARE @Counter AS INT
+	DECLARE @UserName AS VARCHAR(50)
 	
-	/* Set Statements */
-	SET @Password = 'f1no+2l/41Prfwb24n9VOg=='
-	SET @Counter = 1
+/* Create Reconciler Users */
 	PRINT 'Process Started'
-	PRINT ''
-	/* Create Reconciler Users */
 	PRINT '>>Start: Creating ' + CAST(@Reconcilers AS VARCHAR) + ' Reconcilers'
 	WHILE (@Counter <= @Reconcilers)
 	BEGIN
@@ -54,7 +50,8 @@ AS
 	PRINT '>>Finished: Creating ' + CAST(@Reconcilers AS VARCHAR) + ' Reconcilers'
 	PRINT ''
 	PRINT '>>Start: Creating ' + CAST(@Reviewers AS VARCHAR) + ' Reviewers'
-	/* Create Reviewer Users */
+
+/* Create Reviewer Users */
 	SET @Counter = 1
 	WHILE (@Counter <= @Reviewers)
 	BEGIN
@@ -74,7 +71,8 @@ AS
 	PRINT '>>Finished: Creating ' + CAST(@Reviewers AS VARCHAR) + ' Reviewers'
 	PRINT ''
 	PRINT '>>Start: Creating ' + CAST(@Approvers AS VARCHAR) + ' Approvers'
-	/* Create Approver Users */
+
+/* Create Approver Users */
 	SET @Counter = 1
 	WHILE (@Counter <= @Approvers)
 	BEGIN
@@ -95,7 +93,8 @@ AS
 	PRINT ''
 	PRINT ''
 	PRINT '>>Start: Creating ' + CAST(@Approvers AS VARCHAR) + ' AcctOwners'
-	/* Create Approver Users */
+
+/* Create Approver Users */
 	SET @Counter = 1
 	WHILE (@Counter <= @AcctOwners)
 	BEGIN
@@ -115,7 +114,8 @@ AS
 	PRINT '>>Finished: Creating ' + CAST(@Approvers AS VARCHAR) + ' Acct Owners'
 	PRINT ''
 	PRINT '>>Start: Creating ' + CAST(@Admins AS VARCHAR) + ' Administrators'
-	/* Create Admin Users */
+
+/* Create Admin Users */
 	SET @Counter = 1
 	WHILE (@Counter <= @Admins)
 	BEGIN
@@ -136,7 +136,8 @@ AS
 	PRINT '>>Finished: Creating ' + CAST(@Admins AS VARCHAR) + ' Administrators'
 	PRINT ''
 	PRINT '>>Start: Creating ' + CAST(@QA AS VARCHAR) + ' QA Users'
-	/* Create QA Users */
+
+/* Create QA Users */
 	SET @Counter = 1
 	WHILE (@Counter <= @QA)
 	BEGIN

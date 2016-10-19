@@ -11,24 +11,27 @@
 
 CREATE PROCEDURE [dbo].[TOOLKIT_BuildGroups]
 (
-	@NumberOfGroups INT, @ChildrenPerGroup INT
+	@NumberOfGroups Int, @ChildrenPerGroup Int
 )
 AS
-	DECLARE @GrpCount INT
-	DECLARE @GroupSeg VARCHAR(MAX)
-	DECLARE @ChildSeg VARCHAR(MAX)
-	SET @GrpCount = 1
-	SET @GroupSeg = CONVERT(VARCHAR(MAX),@ChildrenPerGroup) + 'Group'
-	PRINT '>> Creating ' + CONVERT(VARCHAR(MAX),@NumberOfGroups) + ' Group Accounts.'
-	EXEC TOOLKIT_BuildTestAccountsWithPrefix @GroupSeg,@NumberOfGroups,1
+	DECLARE @GrpCount Int = 1
+	DECLARE @GroupSeg Varchar(MAX)
+	DECLARE @ChildSeg Varchar(MAX)
+	SET @GroupSeg = CONVERT(Varchar(MAX),@ChildrenPerGroup) + 'Group'
+
+	PRINT '>> Creating ' + CONVERT(Varchar(MAX),@NumberOfGroups) + ' Group Accounts.'
+	EXEC dbo.TOOLKIT_BuildTestAccountsWithPrefix @GroupSeg,@NumberOfGroups,1
+
 	WHILE (@GrpCount <= @NumberOfGroups)
 	BEGIN
-		SET @GroupSeg = CONVERT(VARCHAR(MAX),@ChildrenPerGroup) + 'Group' + CONVERT(VARCHAR(MAX),@GrpCount)
+		SET @GroupSeg = CONVERT(Varchar(MAX),@ChildrenPerGroup) + 'Group' + CONVERT(Varchar(MAX),@GrpCount)
 		SET @ChildSeg = @GroupSeg + 'Child'
-		PRINT '>> Creating ' + CONVERT(VARCHAR(MAX),@ChildrenPerGroup) + ' Child Accounts.'
-		EXEC TOOLKIT_BuildTestAccountsWithPrefix @ChildSeg,@ChildrenPerGroup,0
-		PRINT '>> Assigning ' + CONVERT(VARCHAR(MAX),@ChildrenPerGroup) + ' Child Accounts.'
-		EXEC TOOLKIT_AssignGroups @ChildSeg,@GroupSeg
+
+		PRINT '>> Creating ' + CONVERT(Varchar(MAX),@ChildrenPerGroup) + ' Child Accounts.'
+		EXEC dbo.TOOLKIT_BuildTestAccountsWithPrefix @ChildSeg,@ChildrenPerGroup,0
+
+		PRINT '>> Assigning ' + CONVERT(Varchar(MAX),@ChildrenPerGroup) + ' Child Accounts.'
+		EXEC dbo.TOOLKIT_AssignGroups @ChildSeg,@GroupSeg
 		SET @GrpCount = @GrpCount + 1
 	END
 

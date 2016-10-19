@@ -5,120 +5,113 @@
  *  PURPOSE: Automatically reconciles all accounts ready for the given date.                         *
  *****************************************************************************************************/
 
-CREATE PROCEDURE [dbo].[TOOLKIT_ReconcileAll]
-(
-	@RunEffDate datetime
-)
+CREATE PROCEDURE [dbo].[TOOLKIT_ReconcileAll] ( @RunEffDate DateTime )
 AS
-	DECLARE @accountID AS int
-	DECLARE @reconcilerID AS int
-	DECLARE @forceCarry AS bit
-	DECLARE @now as DateTime
-	DECLARE @EffDate as DateTime
-	DECLARE @ReconID AS int
-	set @forcecarry = 0
---	DECLARE auto_rec_history_cursor CURSOR
---	FOR
-CREATE TABLE [dbo].[my_bulk_recs](
-	[PkId] [int] IDENTITY(1,1) NOT NULL,
-	[AccountId] [int] NOT NULL,
-	[ReconcilerId] [int] NOT NULL,
-	[NextReconEffDate] [datetime] NOT NULL)
+   DECLARE @MinAccountPKId Int = 700500; -- When old account already exist in the system, This defines what acct id to start at.
+   DECLARE @PrepResult Varchar(15) = 'C';   -- Reconciler Status Id 
+   DECLARE @bulkType Varchar(4)  = 'Hist';  -- BulkReconType = Historical Reconciliation 
+   DECLARE @ApprovalResult Varchar(15) = 'PASS';
+   DECLARE @ReviewResult Varchar(15) = 'PASS';
 
-		insert into my_bulk_recs
-		SELECT Accounts.PkId, Accounts.ReconcilerID,  Accounts.NextReconEffDate
-		FROM Accounts
---			INNER JOIN Define_ReconciliationChildFormats CF ON Accounts.ReconciliationFormatID=CF.PkID
---			LEFT OUTER JOIN AccountSegments ON Accounts.PKId=AccountSegments.AccountId 
-		WHERE 
-			Accounts.PKId not in( select a.PKId from accounts a join reconciliations r on r.accountid = a.PKId and r.effectivedate = a.nextreconeffdate)
-			AND Accounts.active=1
-			AND (ReconciliationScheduleID is not null OR ReconciliationScheduleID<>'')
-			AND Accounts.NextReconEffDate = @RunEffDate
-			AND Accounts.PKID > 700500
+   DECLARE @accountID AS Int;
+   DECLARE @reconcilerID AS Int;
+   DECLARE @forceCarry AS Bit = 0;
+   DECLARE @now AS DateTime;
+   DECLARE @EffDate AS DateTime;
+   DECLARE @ReconID AS Int;
 
---	OPEN auto_rec_history_cursor
---	FETCH NEXT FROM auto_rec_history_cursor INTO @accountID, @reconcilerID,  @EffDate
---	WHILE @@Fetch_Status = 0
-declare @mycnt int
-declare @total int
-set @total = (select max(pkid) from my_bulk_recs)
-set @mycnt = (select min(pkid) from my_bulk_recs)
-while (@mycnt < @total)
+   CREATE TABLE [dbo].[my_bulk_recs]
+      ( [PkId] [Int] IDENTITY(1, 1) NOT NULL,
+        [AccountId] [Int] NOT NULL,
+        [ReconcilerId] [Int] NOT NULL,
+        [NextReconEffDate] [DateTime] NOT NULL
+      );
+/*  Get accounts to reconcile  that are not started and for the current effective date  */
+   INSERT   INTO my_bulk_recs
+            SELECT   PKId,
+                     ReconcilerID,
+                     NextReconEffDate
+            FROM     dbo.Accounts
+            WHERE    PKId NOT IN ( SELECT a.PKId
+                                            FROM   dbo.Accounts a
+                                                   JOIN dbo.Reconciliations r ON r.AccountID = a.PKId
+                                                                             AND r.EffectiveDate = a.NextReconEffDate )
+                     AND Active = 1
+                     AND ( ReconciliationScheduleID IS NOT NULL
+                           OR ReconciliationScheduleID <> ''
+                         )
+                     AND NextReconEffDate = @RunEffDate
+                     AND PKId >= @MinAccountPKId;
 
-	BEGIN
-		DECLARE @PrepResult varchar(15)
-		SET @PrepResult = 'C'
-		DECLARE @bulkType varchar(4)
-		set @accountid = (select accountid from my_bulk_recs where pkid = @mycnt)
-		set @reconcilerid = (select reconcilerid from my_bulk_recs where pkid = @mycnt)
-		SET @bulkType = 'hist'
-		PRINT '>>Attempting Historical Reconciliation for ' + Cast(@accountID as varchar)
-		SET @now = getdate();
-		EXEC usp_AddAutoBulkReconciliation @accountID, @RunEffDate, @now, @reconcilerID, @forceCarry, @PrepResult, @bulkType
-		set @mycnt = @mycnt + 1
+   DECLARE @mycnt Int = ( SELECT MIN (PkId) FROM my_bulk_recs );
+   DECLARE @total Int = ( SELECT MAX (PkId) FROM my_bulk_recs );
+
+/*  Historical Reconciliation  */
+   WHILE ( @mycnt < @total )
+      BEGIN
+         SET @accountID = ( SELECT AccountId FROM my_bulk_recs WHERE PkId = @mycnt );
+         SET @reconcilerID = ( SELECT ReconcilerId FROM my_bulk_recs WHERE PkId = @mycnt );
+         SET @now = GETDATE();
+
+         PRINT '>>Attempting Historical Reconciliation for ' + CAST(@accountID AS Varchar);
+         EXEC dbo.usp_AddAutoBulkReconciliation @accountID, @RunEffDate, @now, @reconcilerID, @forceCarry, @PrepResult, @bulkType;
+
+         SET @mycnt = @mycnt + 1;
 --		FETCH NEXT FROM auto_rec_history_cursor INTO @accountID, @reconcilerID, @EffDate
-	END
-drop table my_bulk_recs
+      END;
+   DROP TABLE my_bulk_recs;
 
---	CLOSE auto_rec_history_cursor
---	DEALLOCATE auto_rec_history_cursor
-	
-	DECLARE auto_rev_history_cursor CURSOR
-	FOR
-		SELECT Recon.PKID FROM Reconciliations Recon
-		LEFT OUTER JOIN Accounts Acc ON Recon.AccountID=Acc.PKID
-		WHERE
-			BulkReconciled=1 AND
-			ReconciliationStatusID = 'C' AND
-			ReviewStatusID is NULL AND
-			LOWER(BulkReconType) = 'hist' AND
-			Recon.EffectiveDate = Acc.NextReviewEffDate
+/*  Historical Review	  */
+   DECLARE auto_rev_history_cursor CURSOR
+   FOR
+      SELECT   Recon.PKId
+      FROM     dbo.Reconciliations Recon
+               LEFT OUTER JOIN dbo.Accounts Acc ON Recon.AccountID = Acc.PKId
+      WHERE    Recon.BulkReconciled = 1
+               AND Recon.ReconciliationStatusID = @PrepResult
+               AND Recon.ReviewStatusID IS NULL
+               AND LOWER(Recon.BulkReconType) = @bulkType
+               AND Recon.EffectiveDate = Acc.NextReviewEffDate;
 
-	OPEN auto_rev_history_cursor
-	FETCH NEXT FROM auto_rev_history_cursor INTO @reconID
-	WHILE @@Fetch_Status = 0
-	BEGIN
-		DECLARE @ReviewResult varchar(15)
-		SET @ReviewResult= 'PASS'
-		PRINT '>>Attempting Historical Review for ReconID: ' + Cast(@reconID as varchar)
-		EXEC usp_ReviewAutoBulkCertify @reconID, @ReviewResult
+   OPEN auto_rev_history_cursor;
+   FETCH NEXT FROM auto_rev_history_cursor INTO @ReconID;
+   WHILE @@Fetch_Status = 0
+      BEGIN
+         PRINT '>>Attempting Historical Review for ReconID: ' + CAST(@ReconID AS Varchar);
+         EXEC dbo.usp_ReviewAutoBulkCertify @ReconID, @ReviewResult;
 
-		FETCH NEXT FROM auto_rev_history_cursor INTO @reconID
-	END
+         FETCH NEXT FROM auto_rev_history_cursor INTO @ReconID;
+      END;
 
-	CLOSE auto_rev_history_cursor
-	DEALLOCATE auto_rev_history_cursor
-	
-	DECLARE auto_app_history_cursor CURSOR
-	FOR
-		SELECT Recon.PKID FROM Reconciliations Recon
-		LEFT OUTER JOIN Accounts Acc ON Recon.AccountID=Acc.PKID
-		WHERE
-			Recon.BulkReconciled=1 AND
-			ReconciliationStatusID = 'C' AND
-			ReviewStatusID = 'C' AND
-			Recon.ApprovalStatusID is NULL AND
-			LOWER(BulkReconType) = 'hist' AND
-			Recon.RequiresApproval = 1 AND
-			Recon.EffectiveDate = Acc.NextApprovalEffDate
+   CLOSE auto_rev_history_cursor;
+   DEALLOCATE auto_rev_history_cursor;
 
-	OPEN auto_app_history_cursor
-	FETCH NEXT FROM auto_app_history_cursor INTO @reconID
-	WHILE @@Fetch_Status = 0
-	BEGIN
-		DECLARE @ApprovalResult varchar(15)
-		SET @ApprovalResult= 'PASS'
-		PRINT '>>Attempting Historical Approval for ReconID: ' + Cast(@reconID as varchar)
-		EXEC usp_ApproveAutoBulkCertify @reconID, @ApprovalResult
+/*  Historical Approval  */	
+   DECLARE auto_app_history_cursor CURSOR
+   FOR
+      SELECT   Recon.PKId
+      FROM     dbo.Reconciliations Recon
+               LEFT OUTER JOIN dbo.Accounts Acc ON Recon.AccountID = Acc.PKId
+      WHERE    Recon.BulkReconciled = 1
+               AND Recon.ReconciliationStatusID = 'C'
+               AND Recon.ReviewStatusID = 'C'
+               AND Recon.ApprovalStatusID IS NULL
+               AND LOWER(Recon.BulkReconType) = 'hist'
+               AND Recon.RequiresApproval = 1
+               AND Recon.EffectiveDate = Acc.NextApprovalEffDate;
 
-		FETCH NEXT FROM auto_app_history_cursor INTO @reconID
-	END
+   OPEN auto_app_history_cursor;
+   FETCH NEXT FROM auto_app_history_cursor INTO @ReconID;
+   WHILE @@Fetch_Status = 0
+      BEGIN
+         PRINT '>>Attempting Historical Approval for ReconID: ' + CAST(@ReconID AS Varchar);
+         EXEC dbo.usp_ApproveAutoBulkCertify @ReconID, @ApprovalResult;
 
-	CLOSE auto_app_history_cursor
-	DEALLOCATE auto_app_history_cursor
+         FETCH NEXT FROM auto_app_history_cursor INTO @ReconID;
+      END;
 
+   CLOSE auto_app_history_cursor;
+   DEALLOCATE auto_app_history_cursor;
 
 
 GO
-

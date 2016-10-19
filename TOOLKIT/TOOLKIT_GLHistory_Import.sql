@@ -1,4 +1,4 @@
-
+/*  Use usp_Interface_ImportGlBalancesOnly  instead of this one*/
 CREATE PROCEDURE [dbo].[TOOLKIT_GLHistory_Import]
 (@InterfaceID INT, @StartTime DATETIME, @InterfaceHistoryPKId INT)
 AS
