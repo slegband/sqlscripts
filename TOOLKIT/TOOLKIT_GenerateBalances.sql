@@ -4,7 +4,7 @@
  *	Inputs: @ForEffDate datetime, @ZeroBalances bit, @AutoInsert bit                                                                 *
  *	Purpose: Generates balances for all accounts in the system for a given effective date.                                           *
  *	Usage: EXEC TOOLKIT_GenerateBalances EffectiveDate,ZeroBalance,AutoInsert                                                        *
- *	Example: EXEC TOOLKIT_GenerateBalances '20090930',1,1                                                                            *
+ *	Example: EXEC TOOLKIT_GenerateBalances '20170130',0,0                                                                            *
  *	Input Descriptions:                                                                                                              *
  *			@ForEffDate: The effective date for which the balances should be inserted.                                               *
  *			@ZeroBalances: Indicates whether zero balances (1) or random balances (0) should be used                                 *
@@ -13,61 +13,80 @@
 
 CREATE PROCEDURE [dbo].[TOOLKIT_GenerateBalances] (@ForEffDate DateTime, @ZeroBalances Bit, @AutoInsert Bit)
 AS
+	SET NOCOUNT ON; 
 	DECLARE @CCY1EndBalance Money;
 	DECLARE @CCY2EndBalance Money;
 	DECLARE @CCY3EndBalance Money;
-	DECLARE @Period Char(2);
-	DECLARE @Year Char(4);
+	DECLARE @Period NChar(2);
+	DECLARE @Year NChar(4);
 	DECLARE @EffectiveDate DateTime;
 
-	DECLARE @AS1 Varchar(50);
-	DECLARE @AS2 Varchar(50);
-	DECLARE @AS3 Varchar(50);
-	DECLARE @AS4 Varchar(50);
-	DECLARE @AS5 Varchar(50);
-	DECLARE @AS6 Varchar(50);
-	DECLARE @AS7 Varchar(50);
-	DECLARE @AS8 Varchar(50);
-	DECLARE @AS9 Varchar(50);
-	DECLARE @AS10 Varchar(50);
+	DECLARE @AS1 NVarchar(50);
+	DECLARE @AS2 NVarchar(50);
+	DECLARE @AS3 NVarchar(50);
+	DECLARE @AS4 NVarchar(50);
+	DECLARE @AS5 NVarchar(50);
+	DECLARE @AS6 NVarchar(50);
+	DECLARE @AS7 NVarchar(50);
+	DECLARE @AS8 NVarchar(50);
+	DECLARE @AS9 NVarchar(50);
+	DECLARE @AS10 NVarchar(50);
 
-	DECLARE @AccountName Varchar(200);
-	DECLARE @CCY1Code Char(3);
-	DECLARE @CCY2Code Char(3);
-	DECLARE @CCY3Code Char(3);
+	DECLARE @AccountName NVarchar(200);
+	DECLARE @CCY1Code NChar(3);
+	DECLARE @CCY2Code NChar(3);
+	DECLARE @CCY3Code NChar(3);
 
 	IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[BalancesTempTable]') AND type IN (N'U'))
-	DROP TABLE [dbo].[BalancesTempTable];
+	DROP TABLE [dbo].[GLBalancesOnlyTempTable];
 
-	CREATE TABLE [dbo].[BalancesTempTable]
+	CREATE TABLE [dbo].[GLBalancesOnlyTempTable]
 	(
 		[PKId] [Int] IDENTITY(1,1) NOT NULL,
 		AccountPKID Int,
-		AccountSegment1 Varchar(50),
-		AccountSegment2 Varchar(50),
-		AccountSegment3 Varchar(50),
-		AccountSegment4 Varchar(50),
-		AccountSegment5 Varchar(50),
-		AccountSegment6 Varchar(50),
-		AccountSegment7 Varchar(50),
-		AccountSegment8 Varchar(50),
-		AccountSegment9 Varchar(50),
-		AccountSegment10 Varchar(50),
-		AccountName Varchar(200),
-		CCY1Code Char(3),
+		AccountSegment1 NVarchar(50),
+		AccountSegment2 NVarchar(50),
+		AccountSegment3 NVarchar(50),
+		AccountSegment4 NVarchar(50),
+		AccountSegment5 NVarchar(50),
+		AccountSegment6 NVarchar(50),
+		AccountSegment7 NVarchar(50),
+		AccountSegment8 NVarchar(50),
+		AccountSegment9 NVarchar(50),
+		AccountSegment10 NVarchar(50),
+		AccountName NVarchar(200),
+		CCY1Code NChar(3),
 		CCY1EndBalance Money,
-		CCY2Code Char(3),
+		CCY2Code NChar(3),
 		CCY2EndBalance Money,
-		CCY3Code Char(3),
+		CCY3Code NChar(3),
 		CCY3EndBalance Money,
-		Period Char(2),
-		[Year] Char(4),
+		Period NChar(2),
+		[Year] NChar(4),
 		EffectiveDate DateTime,
-		GLHistoryUpdatedFlag Bit
+		GLHistoryUpdatedFlag BIT,
+		CCY1NetDebits MONEY NULL,
+		CCY2NetDebits MONEY NULL,
+		CCY3NetDebits MONEY NULL,
+		CCY1NetCredits MONEY NULL,
+		CCY2NetCredits MONEY NULL,
+		CCY3NetCredits MONEY NULL,
+		CCY1TransCount INT NULL,
+		CCY2TransCount INT NULL,
+		CCY3TransCount INT NULL
 	);
+		SELECT @EffectiveDate=EffectiveDate,@Period=FiscalMonth,@Year=FiscalYear FROM EffectiveDates WHERE EffectiveDate = @ForEffDate;
 
-	DECLARE BALANCES CURSOR
-	FOR
+
+INSERT INTO GLBalancesOnlyTempTable 
+	(	AccountSegment1, AccountSegment2,AccountSegment3,AccountSegment4,AccountSegment5,
+		AccountSegment6,AccountSegment7,AccountSegment8,AccountSegment9,AccountSegment10,
+		AccountName,
+		CCY1Code, CCY1EndBalance,
+		CCY2Code, CCY2EndBalance,
+		CCY3Code, CCY3EndBalance,
+		Period, [Year], EffectiveDate, GLHistoryUpdatedFlag
+	)	
 	SELECT 
 		acs.AccountSegment1,
 		acs.AccountSegment2,
@@ -81,82 +100,19 @@ AS
 		acs.AccountSegment10,
 		acc.AccountName,
 		acc.CCY1Code,
+		CASE WHEN @ZeroBalances = 1 THEN 0 ELSE RAND() * 100000 END AS CCY1EndBalance,
 		acc.CCY2Code,
-		acc.CCY3Code
+		CASE WHEN @ZeroBalances = 1 THEN 0 ELSE RAND() * 100000 END AS CCY2EndBalance,
+		acc.CCY3Code,
+		CASE WHEN @ZeroBalances = 1 THEN 0 ELSE RAND() * 100000 END AS CCY3EndBalance,
+		@EffectiveDate AS EffectiveDate,
+		@Period AS FiscalMonth,
+		@Year AS FiscalYear,
+		0 AS GLHistoryUpdatedFlag
 	FROM Accounts acc
 	LEFT OUTER JOIN AccountSegments acs ON acc.PKId = acs.AccountId WHERE acc.IsGroup <> 1;
 
-	OPEN BALANCES;
 
-	FETCH NEXT FROM BALANCES INTO @AS1,@AS2,@AS3,@AS4,@AS5,@AS6,@AS7,@AS8,@AS9,@AS10,@AccountName,@CCY1Code,@CCY2Code,@CCY3Code;
-
-	WHILE (@@FETCH_STATUS <> -1)
-	BEGIN
-		IF (@ZeroBalances = 1)
-		BEGIN
-			SET @CCY1EndBalance = 0;
-			SET @CCY2EndBalance = 0;
-			SET @CCY3EndBalance = 0;
-		END;
-		ELSE
-		BEGIN
-			SET @CCY1EndBalance = RAND() * 100000;
-			SET @CCY2EndBalance = RAND() * 100000;
-			SET @CCY3EndBalance = RAND() * 100000;
-		END;
-		
-		SELECT @EffectiveDate=EffectiveDate,@Period=FiscalMonth,@Year=FiscalYear FROM EffectiveDates WHERE EffectiveDate = @ForEffDate;
-		
-		INSERT INTO BalancesTempTable 
-		(	AccountSegment1,
-			AccountSegment2,
-			AccountSegment3,
-			AccountSegment4,
-			AccountSegment5,
-			AccountSegment6,
-			AccountSegment7,
-			AccountSegment8,
-			AccountSegment9,
-			AccountSegment10,
-			AccountName,
-			CCY1Code,
-			CCY1EndBalance,
-			CCY2Code,
-			CCY2EndBalance,
-			CCY3Code,
-			CCY3EndBalance,
-			Period,
-			[Year],
-			EffectiveDate
-		)
-		VALUES
-		(	@AS1,
-			@AS2,
-			@AS3,
-			@AS4,
-			@AS5,
-			@AS6,
-			@AS7,
-			@AS8,
-			@AS9,
-			@AS10,
-			@AccountName,
-			@CCY1Code,
-			@CCY1EndBalance,
-			@CCY2Code,
-			@CCY2EndBalance,
-			@CCY3Code,
-			@CCY3EndBalance,
-			@Period,
-			@Year,
-			@EffectiveDate
-		);
-		
-		FETCH NEXT FROM BALANCES INTO @AS1,@AS2,@AS3,@AS4,@AS5,@AS6,@AS7,@AS8,@AS9,@AS10,@AccountName,@CCY1Code,@CCY2Code,@CCY3Code;
-	END;
-
-	CLOSE BALANCES;
-	DEALLOCATE BALANCES;
 
     IF ( @AutoInsert = 0
          OR @AutoInsert IS NULL
