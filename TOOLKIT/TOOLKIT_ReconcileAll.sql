@@ -3,11 +3,16 @@
  *  TOOLKIT_ReconcileAll procedure:                                                                  *
  *      @RunEffDate - Effective Date to Run                                                          *
  *  PURPOSE: Automatically reconciles all accounts ready for the given date.                         *
+ *  Example:																						 *
+    EXEC [dbo].[TOOLKIT_ReconcileAll]  '2016-02-28'
+ *	Note: This is a SSMS CPU intensive procedure that should be run on the server, not remotely.																								 *
  *****************************************************************************************************/
-
-CREATE PROCEDURE [dbo].[TOOLKIT_ReconcileAll] ( @RunEffDate DateTime )
-AS
-   DECLARE @MinAccountPKId Int = 700500; -- When old account already exist in the system, This defines what acct id to start at.
+ 
+--CREATE PROCEDURE [dbo].[ToolKit_ReconcileAll] ( @RunEffDate DateTime )
+--AS
+DECLARE  @RunEffDate DateTime = '2016-02-28'
+SET NOCOUNT ON 
+   DECLARE @MinAccountPKId Int = 0; -- When old account already exist in the system, This defines what acct id to start at.
    DECLARE @PrepResult Varchar(15) = 'C';   -- Reconciler Status Id 
    DECLARE @bulkType Varchar(4)  = 'Hist';  -- BulkReconType = Historical Reconciliation 
    DECLARE @ApprovalResult Varchar(15) = 'PASS';
@@ -40,7 +45,8 @@ AS
                      AND ( ReconciliationScheduleID IS NOT NULL
                            OR ReconciliationScheduleID <> ''
                          )
-                     AND NextReconEffDate = @RunEffDate
+                     AND ReconcilerID IS NOT NULL 
+					 AND NextReconEffDate = @RunEffDate
                      AND PKId >= @MinAccountPKId;
 
    DECLARE @mycnt Int = ( SELECT MIN (PkId) FROM my_bulk_recs );
@@ -57,12 +63,11 @@ AS
          EXEC dbo.usp_AddAutoBulkReconciliation @accountID, @RunEffDate, @now, @reconcilerID, @forceCarry, @PrepResult, @bulkType;
 
          SET @mycnt = @mycnt + 1;
---		FETCH NEXT FROM auto_rec_history_cursor INTO @accountID, @reconcilerID, @EffDate
       END;
    DROP TABLE my_bulk_recs;
 
 /*  Historical Review	  */
-   DECLARE auto_rev_history_cursor CURSOR
+   DECLARE auto_rev_history_cursor CURSOR LOCAL FAST_FORWARD 
    FOR
       SELECT   Recon.PKId
       FROM     dbo.Reconciliations Recon
@@ -71,7 +76,8 @@ AS
                AND Recon.ReconciliationStatusID = @PrepResult
                AND Recon.ReviewStatusID IS NULL
                AND LOWER(Recon.BulkReconType) = @bulkType
-               AND Recon.EffectiveDate = Acc.NextReviewEffDate;
+               AND Recon.EffectiveDate = Acc.NextReviewEffDate
+			   AND acc.Active = 1;
 
    OPEN auto_rev_history_cursor;
    FETCH NEXT FROM auto_rev_history_cursor INTO @ReconID;
@@ -87,7 +93,7 @@ AS
    DEALLOCATE auto_rev_history_cursor;
 
 /*  Historical Approval  */	
-   DECLARE auto_app_history_cursor CURSOR
+   DECLARE auto_app_history_cursor CURSOR LOCAL FAST_FORWARD
    FOR
       SELECT   Recon.PKId
       FROM     dbo.Reconciliations Recon

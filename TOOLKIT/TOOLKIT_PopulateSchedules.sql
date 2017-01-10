@@ -4,7 +4,10 @@
  *	PURPOSE: Creates one of each schedule type with montly values.          *
  *  INSTRUCTIONS:                                                           *
  *       1.) Modify as Necessary                                            *
- *       2.) Run to Create Rec, Rev, and App 1-5 Schedules                  *
+ *       2.) Run to Create Rec, Rev, and App 1-4 Schedules                  *
+ *       3.) Parameters @StartEffDate is the starting effective date, 
+						@Years is the number of years to populate the effective dates.
+   EXEC dbo.TOOLKIT_PopulateSchedules @StartEffDate = '2016-01-01', @Years=3   
  ****************************************************************************/
 CREATE PROCEDURE [dbo].[TOOLKIT_PopulateSchedules] (@StartEffDate DateTime, @Years Int)
 AS
@@ -43,7 +46,7 @@ BEGIN
 	EXEC TOOLKIT_AddAppScheduleDates 'APP2',@Cycles,M;
 	EXEC TOOLKIT_AddAppScheduleDates 'APP3',@Cycles,M;
 	EXEC TOOLKIT_AddAppScheduleDates 'APP4',@Cycles,M;
-	EXEC TOOLKIT_AddAppScheduleDates 'APP5',@Cycles,M;
+	--EXEC TOOLKIT_AddAppScheduleDates 'APP5',@Cycles,M;
 
     INSERT  INTO EffectiveDates
             SELECT   EffDate AS EffectiveDate,
