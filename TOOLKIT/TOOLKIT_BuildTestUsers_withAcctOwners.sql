@@ -10,13 +10,13 @@
  *			Approvers: The number of Approver users to generate.		      	                *
  *			Admins: The number of Admin users to generate.                        	            *
  *			QA: The number of QA users to generate.		                 	                    *
- *			@RecFirstName is the name of the user before number appended, default = 'Rec',
- *			@RevFirstName       default = 'Rev',
- *			@ApprFirstName      default = 'Appr',
- *			@AcctOwnerFirstName default = 'AcctOwner',
- *			@AdminFirstName     default = 'Admin',
- *			@QAFirstName        default = 'QA',
-						                 	                                        *
+ *			@RecFirstName is the name of the user before number appended, default = 'Rec',	    *
+ *			@RevFirstName       default = 'Rev',		                 	                    *
+ *			@ApprFirstName      default = 'Appr',		                 	                    *
+ *			@AcctOwnerFirstName default = 'AcctOwner',		                 	                *
+ *			@AdminFirstName     default = 'Admin',		                 	                    *
+ *			@QAFirstName        default = 'QA',		                 	                        *
+ *									                 	                                        *
  ************************************************************************************************/
 
 CREATE PROCEDURE [dbo].[TOOLKIT_BuildTestUsers_withOwners]
