@@ -28,8 +28,6 @@ AS
    DECLARE @Year NChar(4);
    DECLARE @EffectiveDate DateTime;
 
-IF @AutoInsert = 1  -- This table will be re-loaded.
-	BEGIN
 	   PRINT 'Re-creating SubLedgerBalancesOnlyTempTable'
 	   IF EXISTS ( SELECT   * FROM     sys.objects  WHERE    object_id = OBJECT_ID(N'[dbo].[SubLedgerBalancesOnlyTempTable]') AND type IN ( N'U' ) )
 		  DROP TABLE dbo.SubLedgerBalancesOnlyTempTable;
@@ -45,7 +43,6 @@ IF @AutoInsert = 1  -- This table will be re-loaded.
 			Period NChar(2), Year NChar(4), EffectiveDate DateTime,
 			GLHistoryUpdatedFlag Bit
 		  );
-	END;
 
    SELECT   @EffectiveDate = EffectiveDate, 
             @Period = FiscalMonth, 
@@ -98,7 +95,8 @@ IF @AutoInsert = 1  -- This table will be re-loaded.
  						 OR acs.AccountSegment10 IS NOT NULL
 					    )
 					AND acc.Active = 1  -- Do not create for non-reconcilable accounts.
-
+					AND acc.ReconcilerID >1
+					AND acc.ReviewerID >1
    IF ( @AutoInsert = 0
         OR @AutoInsert IS NULL
       )
