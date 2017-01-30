@@ -1,22 +1,42 @@
 
 /*****************************************************************************************************
  *  TOOLKIT_ReconcileAll procedure:                                                                  *
- *      @RunEffDate - Effective Date to Run                                                          *
+ *    @RunEffDate DATETIME,                  -- Effective Date to use as for the Reconciliation      *
+ *    @MinAccountPKId INT = 1,               -- This defines what acct id to start at. Default = 1   *
+ *    @bulkType Varchar(4)  = 'Hist',        -- BulkReconType = Hist = Historical Reconciliation     *
+ *    @PrepResult Varchar(15) = 'C',         -- Reconciler Result Status Id Default = C              *
+ *    @ReviewResult Varchar(15) = 'PASS',    -- Reviewers Result = 'PASS"                            *
+ *    @ApprovalResult Varchar(15) = 'PASS'   -- Approvers  Result = 'PASS"                           *
  *  PURPOSE: Automatically reconciles all accounts ready for the given date.                         *
  *  Example:																						 *
-    EXEC [dbo].[TOOLKIT_ReconcileAll]  '2016-02-28'
- *	Note: This is a SSMS CPU intensive procedure that should be run on the server, not remotely.																								 *
+    EXEC [dbo].[Toolkit_ReconcileAll]  @RunEffDate = '2016-02-28', 
+		@MinAccountPKId INT = 1, @bulkType Varchar(4)  = 'Hist', 
+		@PrepResult Varchar(15) = 'C', 
+		@ReviewResult Varchar(15) = 'PASS', @ApprovalResult Varchar(15) = 'PASS'
+ *	Note: This is a SSMS CPU intensive procedure that should be run on the server, not remotely      *
+ *        FOR Large databases, you should send results to a file or you may run out of memory		 *
  *****************************************************************************************************/
- 
---CREATE PROCEDURE [dbo].[ToolKit_ReconcileAll] ( @RunEffDate DateTime )
---AS
-DECLARE  @RunEffDate DateTime = '2016-02-28'
+IF EXISTS (SELECT OBJECT_ID('dbo.Toolkit_ReconcileAll'))
+	DROP PROCEDURE dbo.Toolkit_ReconcileAll;
+GO 
+CREATE PROCEDURE [dbo].[ToolKit_ReconcileAll] 
+( @RunEffDate DATETIME,                  -- Effective Date to use as for the Reconciliation
+  @MinAccountPKId INT         = 1,       -- This defines what acct id to start at. Default = 1
+  @bulkType Varchar(4)        = 'Hist',  -- BulkReconType = Hist = Historical Reconciliation 
+  @PrepResult Varchar(15)     = 'C',     -- Reconciler Result Status Id Default = C
+  @ReviewResult Varchar(15)   = 'PASS',  -- Reviewers Result = 'PASS"
+  @ApprovalResult Varchar(15) = 'PASS'   -- Approvers  Result = 'PASS"
+  )
+AS
+
 SET NOCOUNT ON 
-   DECLARE @MinAccountPKId Int = 0; -- When old account already exist in the system, This defines what acct id to start at.
-   DECLARE @PrepResult Varchar(15) = 'C';   -- Reconciler Status Id 
-   DECLARE @bulkType Varchar(4)  = 'Hist';  -- BulkReconType = Historical Reconciliation 
-   DECLARE @ApprovalResult Varchar(15) = 'PASS';
-   DECLARE @ReviewResult Varchar(15) = 'PASS';
+--DECLARE  @RunEffDate DateTime = '2016-02-28'
+---- select MAX(PKId) FROM accounts where NextReconEffDate = '2016-02-28'
+--   DECLARE @MinAccountPKId Int = 1--163834; -- This defines what acct id to start at.
+--   DECLARE @PrepResult Varchar(15) = 'C';   -- Reconciler Status Id 
+--   DECLARE @bulkType Varchar(4)  = 'Hist';  -- BulkReconType = Historical Reconciliation 
+--   DECLARE @ApprovalResult Varchar(15) = 'PASS';
+--   DECLARE @ReviewResult Varchar(15) = 'PASS';
 
    DECLARE @accountID AS Int;
    DECLARE @reconcilerID AS Int;
@@ -24,7 +44,17 @@ SET NOCOUNT ON
    DECLARE @now AS DateTime;
    DECLARE @EffDate AS DateTime;
    DECLARE @ReconID AS Int;
-
+   IF EXISTS ( SELECT   * FROM     sys.tables WHERE    name = 'my_bulk_recs_output' )
+    DROP TABLE my_bulk_recs_output;
+   CREATE TABLE my_bulk_recs_output
+    ( [PkId] [INT] IDENTITY(1, 1) NOT NULL ,
+      [Count] [INT] NOT NULL ,
+      AccountId INT NOT NULL ,
+      Info VARCHAR(999) NULL ,
+      Starttime DATETIME NOT NULL
+    );
+   IF EXISTS ( SELECT   * FROM     sys.tables WHERE    name = 'my_bulk_recs' )
+    DROP TABLE my_bulk_recs;
    CREATE TABLE [dbo].[my_bulk_recs]
       ( [PkId] [Int] IDENTITY(1, 1) NOT NULL,
         [AccountId] [Int] NOT NULL,
@@ -33,40 +63,48 @@ SET NOCOUNT ON
       );
 /*  Get accounts to reconcile  that are not started and for the current effective date  */
    INSERT   INTO my_bulk_recs
-            SELECT   PKId,
-                     ReconcilerID,
-                     NextReconEffDate
-            FROM     dbo.Accounts
-            WHERE    PKId NOT IN ( SELECT a.PKId
+            SELECT   acct.PKId,
+                     acct.ReconcilerID,
+                     acct.NextReconEffDate
+            FROM     dbo.Accounts acct
+            WHERE    acct.PKId NOT IN ( SELECT a.PKId
                                             FROM   dbo.Accounts a
                                                    JOIN dbo.Reconciliations r ON r.AccountID = a.PKId
-                                                                             AND r.EffectiveDate = a.NextReconEffDate )
-                     AND Active = 1
-                     AND ( ReconciliationScheduleID IS NOT NULL
-                           OR ReconciliationScheduleID <> ''
+                                                                             AND r.EffectiveDate = a.NextReconEffDate 
+												WHERE r.ReconciliationStatusID = 'C')
+                     AND acct.Active = 1
+                     AND ( acct.ReconciliationScheduleID IS NOT NULL
+                           OR acct.ReconciliationScheduleID <> ''
                          )
-                     AND ReconcilerID IS NOT NULL 
-					 AND NextReconEffDate = @RunEffDate
-                     AND PKId >= @MinAccountPKId;
-
+                     AND acct.ReconcilerID IS NOT NULL 
+					 AND acct.NextReconEffDate = @RunEffDate
+                     AND acct.PKId >= @MinAccountPKId
+		ORDER BY acct.PKId
    DECLARE @mycnt Int = ( SELECT MIN (PkId) FROM my_bulk_recs );
    DECLARE @total Int = ( SELECT MAX (PkId) FROM my_bulk_recs );
-
 /*  Historical Reconciliation  */
    WHILE ( @mycnt < @total )
       BEGIN
-         SET @accountID = ( SELECT AccountId FROM my_bulk_recs WHERE PkId = @mycnt );
-         SET @reconcilerID = ( SELECT ReconcilerId FROM my_bulk_recs WHERE PkId = @mycnt );
+         SELECT @accountID = AccountId, @reconcilerID = ReconcilerId  
+		 FROM my_bulk_recs 
+		 WHERE PkId = @mycnt;
          SET @now = GETDATE();
 
-         PRINT '>>Attempting Historical Reconciliation for ' + CAST(@accountID AS Varchar);
+		 INSERT INTO dbo.my_bulk_recs_output
+		         ( Count, AccountId, Info, Starttime )
+		 VALUES  ( @mycnt, -- Count - int
+		           @accountID, -- AccountId - int
+		           '>>Attempting Historical Reconciliation', -- Info - varchar(999)
+		           @now  -- Starttime - smalldatetime
+		           ) 
          EXEC dbo.usp_AddAutoBulkReconciliation @accountID, @RunEffDate, @now, @reconcilerID, @forceCarry, @PrepResult, @bulkType;
 
          SET @mycnt = @mycnt + 1;
       END;
    DROP TABLE my_bulk_recs;
-
+  -- SELECT * FROM dbo.my_bulk_recs
 /*  Historical Review	  */
+/**************auto_rev_history_cursor**********************************************************************************/
    DECLARE auto_rev_history_cursor CURSOR LOCAL FAST_FORWARD 
    FOR
       SELECT   Recon.PKId
@@ -91,9 +129,11 @@ SET NOCOUNT ON
 
    CLOSE auto_rev_history_cursor;
    DEALLOCATE auto_rev_history_cursor;
+/********  auto_rev_history_cursor**********************************************************************************/
 
 /*  Historical Approval  */	
-   DECLARE auto_app_history_cursor CURSOR LOCAL FAST_FORWARD
+/*******  auto_app_history_cursor **********************************************************************************/
+  DECLARE auto_app_history_cursor CURSOR LOCAL FAST_FORWARD
    FOR
       SELECT   Recon.PKId
       FROM     dbo.Reconciliations Recon
@@ -118,6 +158,6 @@ SET NOCOUNT ON
 
    CLOSE auto_app_history_cursor;
    DEALLOCATE auto_app_history_cursor;
-
-
+/*******  auto_app_history_cursor **********************************************************************************/
 GO
+--COMMIT

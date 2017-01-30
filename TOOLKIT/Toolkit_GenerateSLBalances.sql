@@ -7,7 +7,7 @@
  *	Example: EXEC dbo.Toolkit_GenerateSLBalances @ForEffDate = '2016-01-30', @ZeroBalances = 0, @AutoInsert = 0                      *
  *	Example:                                                                                                                         * 
 	TRUNCATE TABLE	dbo.Interface_LoadStatus 
-	EXEC dbo.Toolkit_GenerateSLBalances @ForEffDate = '2016-02-28', @ZeroBalances = 0, @AutoInsert = 1                        
+	EXEC dbo.Toolkit_GenerateSLBalances @ForEffDate = '2016-02-28', @ZeroBalances = 0, @AutoInsert = 0                        
  *	Input Descriptions:                                                                                                              *
  *			@ForEffDate: The effective date for which the balances should be inserted.                                               *
  *			@ZeroBalances: Indicates whether zero balances (1) or random balances (0) should be used                                 *

@@ -7,14 +7,14 @@
  *	Example: EXEC dbo.TOOLKIT_GenerateBalances @ForEffDate = '2016-01-30', @ZeroBalances = 0, @AutoInsert = 0                        *
  *	Example:                                                                                                                         *
   truncate TABLE	dbo.Interface_LoadStatus 
-  EXEC dbo.TOOLKIT_GenerateBalances @ForEffDate = '2016-02-28', @ZeroBalances = 0, @AutoInsert = 1                        
+  EXEC dbo.TOOLKIT_GenerateBalances @ForEffDate = '2016-02-28', @ZeroBalances = 0, @AutoInsert = 0                        
  *	Input Descriptions:                                                                                                              *
  *			@ForEffDate: The effective date for which the balances should be inserted.                                               *
  *			@ZeroBalances: Indicates whether zero balances (1) or random balances (0) should be used                                 *
  *			@AutoInsert: Indicates whether the balances should be put into the database (1) or only output (0 for manual import)     *
  *************************************************************************************************************************************/
 
-ALTER PROCEDURE dbo.TOOLKIT_GenerateBalances
+ALTER PROCEDURE dbo.Toolkit_GenerateBalances
    ( @ForEffDate DateTime,
      @ZeroBalances Bit = 0,
      @AutoInsert Bit = 0
