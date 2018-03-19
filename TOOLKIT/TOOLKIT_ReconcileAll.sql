@@ -9,10 +9,10 @@
  *    @ApprovalResult Varchar(15) = 'PASS'   -- Approvers  Result = 'PASS"                           *
  *  PURPOSE: Automatically reconciles all accounts ready for the given date.                         *
  *  Example:																						 *
-    EXEC [dbo].[Toolkit_ReconcileAll]  @RunEffDate = '2016-02-28', 
-		@MinAccountPKId INT = 1, @bulkType Varchar(4)  = 'Hist', 
-		@PrepResult Varchar(15) = 'C', 
-		@ReviewResult Varchar(15) = 'PASS', @ApprovalResult Varchar(15) = 'PASS'
+    EXEC [dbo].[Toolkit_ReconcileAll]  @RunEffDate = '2016-03-31', 
+		@MinAccountPKId = 1, @bulkType = 'Hist', 
+		@PrepResult  = 'C', 
+		@ReviewResult  = 'PASS', @ApprovalResult = 'PASS'
  *	Note: This is a SSMS CPU intensive procedure that should be run on the server, not remotely      *
  *        FOR Large databases, you should send results to a file or you may run out of memory		 *
  *****************************************************************************************************/
@@ -62,6 +62,7 @@ SET NOCOUNT ON
         [NextReconEffDate] [DateTime] NOT NULL
       );
 /*  Get accounts to reconcile  that are not started and for the current effective date  */
+PRINT 'Entering INSERT   INTO my_bulk_recs'
    INSERT   INTO my_bulk_recs
             SELECT   acct.PKId,
                      acct.ReconcilerID,
@@ -82,6 +83,8 @@ SET NOCOUNT ON
 		ORDER BY acct.PKId
    DECLARE @mycnt Int = ( SELECT MIN (PkId) FROM my_bulk_recs );
    DECLARE @total Int = ( SELECT MAX (PkId) FROM my_bulk_recs );
+PRINT ' Entering Historical Reconciliation  '
+PRINT 'TOTAL RECS = '+ Str(@total)
 /*  Historical Reconciliation  */
    WHILE ( @mycnt < @total )
       BEGIN
@@ -104,6 +107,17 @@ SET NOCOUNT ON
    DROP TABLE my_bulk_recs;
   -- SELECT * FROM dbo.my_bulk_recs
 /*  Historical Review	  */
+PRINT ' Entering ***auto_rev_history_cursor*'
+      SELECT   @total = Count(*)
+      FROM     dbo.Reconciliations Recon
+               LEFT OUTER JOIN dbo.Accounts Acc ON Recon.AccountID = Acc.PKId
+      WHERE    Recon.BulkReconciled = 1
+               AND Recon.ReconciliationStatusID = @PrepResult
+               AND Recon.ReviewStatusID IS NULL
+               AND LOWER(Recon.BulkReconType) = @bulkType
+               AND Recon.EffectiveDate = Acc.NextReviewEffDate
+			   AND acc.Active = 1;
+PRINT 'TOTAL REVIEWS = '+ Str(@total)
 /**************auto_rev_history_cursor**********************************************************************************/
    DECLARE auto_rev_history_cursor CURSOR LOCAL FAST_FORWARD 
    FOR
@@ -131,7 +145,20 @@ SET NOCOUNT ON
    DEALLOCATE auto_rev_history_cursor;
 /********  auto_rev_history_cursor**********************************************************************************/
 
+PRINT 'Entering Historical Approval'
 /*  Historical Approval  */	
+      SELECT   @TOTAL = Count(*)
+      FROM     dbo.Reconciliations Recon
+               LEFT OUTER JOIN dbo.Accounts Acc ON Recon.AccountID = Acc.PKId
+      WHERE    Recon.BulkReconciled = 1
+               AND Recon.ReconciliationStatusID = 'C'
+               AND Recon.ReviewStatusID = 'C'
+               AND Recon.ApprovalStatusID IS NULL
+               AND LOWER(Recon.BulkReconType) = 'hist'
+               AND Recon.RequiresApproval = 1
+               AND Recon.EffectiveDate = Acc.NextApprovalEffDate;
+
+PRINT 'TOTAL RECS = '+ Str(@total)
 /*******  auto_app_history_cursor **********************************************************************************/
   DECLARE auto_app_history_cursor CURSOR LOCAL FAST_FORWARD
    FOR

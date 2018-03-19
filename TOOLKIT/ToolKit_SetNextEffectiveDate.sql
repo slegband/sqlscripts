@@ -2,9 +2,9 @@
 /*****************************************************************************************************
  *  TOOLKIT_SetEffectiveDate procedure:                                                              *
  *      @StartEffectiveDate - Effective Date to Set                                                  *
- *  PURPOSE: Initializes the account NextDates to the given date.                                    *
+ *  PURPOSE: Initializes New accounts NextDates to the given date.                                    *
  *  Example																							 *
-    EXEC [dbo].[TOOLKIT_SetNextEffectiveDate] '2016-02-28'
+    EXEC [dbo].[TOOLKIT_SetNextEffectiveDate] '2016-03-31'
  *																									 *
  *****************************************************************************************************/
 
